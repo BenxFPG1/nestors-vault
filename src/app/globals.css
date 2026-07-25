@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0e0e0f;
+  --color-surface: #17171a;
+  --color-raised: #1f1f23;
+  --color-line: #2b2b31;
+  --color-chalk: #f2f0eb;
+  --color-mute: #8d8b85;
+  --color-accent: #c9714d;
+}
+
+html,
+body {
+  background: var(--color-ink);
+  color: var(--color-chalk);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-ink);
+}
+
+input::placeholder {
+  color: var(--color-mute);
+}
