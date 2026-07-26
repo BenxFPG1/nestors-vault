@@ -9,7 +9,8 @@
     "start": "next start -p 3939",
     "setup:notion": "tsx scripts/setup-notion.ts",
     "mcp": "tsx mcp/server.ts",
-    "icons": "tsx scripts/make-icons.ts"
+    "icons": "tsx scripts/make-icons.ts",
+    "import": "tsx scripts/import.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

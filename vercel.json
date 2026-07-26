@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/tag",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 /**
- * Eén wachtwoord, één langlopende cookie. Genoeg voor een privévault, en het
- * werkt in de middleware (edge runtime) omdat het alleen Web Crypto gebruikt.
+ * Eén wachtwoord voor de browser, één afgeleide sleutel voor alles wat geen
+ * browser is (Snelkoppelingen, cron, MCP). De sleutel is afgeleid van het
+ * wachtwoord, dus je hoeft nergens je wachtwoord zelf achter te laten.
  */
 
 export const COOKIE = "vault_session";
@@ -14,7 +15,7 @@ function secret(): string {
   );
 }
 
-async function sign(payload: string): Promise<string> {
+async function hmac(payload: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret()),
@@ -32,9 +33,18 @@ async function sign(payload: string): Promise<string> {
     .join("");
 }
 
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/* ── Sessiecookie voor de browser ─────────────────────────────────────── */
+
 export async function createToken(): Promise<string> {
   const payload = `v1.${Date.now() + YEAR_SECONDS * 1000}`;
-  return `${payload}.${await sign(payload)}`;
+  return `${payload}.${await hmac(payload)}`;
 }
 
 export async function isValidToken(token: string | undefined): Promise<boolean> {
@@ -47,15 +57,41 @@ export async function isValidToken(token: string | undefined): Promise<boolean> 
   if (version !== "v1") return false;
   if (!Number(expiry) || Number(expiry) < Date.now()) return false;
 
-  const expected = await sign(`${version}.${expiry}`);
-  return timingSafeEqual(signature, expected);
+  return timingSafeEqual(signature, await hmac(`${version}.${expiry}`));
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+/* ── API-sleutel voor Snelkoppelingen, cron en MCP ────────────────────── */
+
+export async function apiKey(): Promise<string> {
+  return (await hmac("api-sleutel-v1")).slice(0, 32);
+}
+
+export async function isValidApiKey(candidate: string | null): Promise<boolean> {
+  if (!candidate) return false;
+  return timingSafeEqual(candidate, await apiKey());
+}
+
+/**
+ * Accepteert drie soorten toegang: de sessiecookie van de browser, de
+ * API-sleutel (header of ?key=), en de cron van Vercel.
+ */
+export async function isAuthorized(request: {
+  cookies: { get: (name: string) => { value: string } | undefined };
+  headers: { get: (name: string) => string | null };
+  nextUrl: { searchParams: URLSearchParams };
+}): Promise<boolean> {
+  if (await isValidToken(request.cookies.get(COOKIE)?.value)) return true;
+
+  const provided =
+    request.headers.get("x-vault-key") ?? request.nextUrl.searchParams.get("key");
+  if (await isValidApiKey(provided)) return true;
+
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && request.headers.get("authorization") === `Bearer ${cronSecret}`) {
+    return true;
+  }
+
+  return false;
 }
 
 /** Zonder wachtwoord is de vault open — prima lokaal, nooit in productie. */

@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { COOKIE, isValidToken, authRequired } from "@/lib/auth";
+import { isAuthorized, authRequired } from "@/lib/auth";
 
 export const config = {
-  // Alles afschermen behalve de inlogpagina, het icoon en de Next-assets.
-  matcher: ["/((?!login|api/login|_next/static|_next/image|icons|manifest).*)"],
+  // Openbaar: inlogpagina, deel-moodboard en assets. De MCP-route bewaakt
+  // zichzelf met de sleutel in het pad. Al het andere gaat door de poort.
+  matcher: [
+    "/((?!login|deel|api/login|api/deel|api/mcp|_next/static|_next/image|icons|manifest).*)",
+  ],
 };
 
 export async function middleware(request: NextRequest) {
@@ -16,9 +19,7 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  if (await isValidToken(request.cookies.get(COOKIE)?.value)) {
-    return NextResponse.next();
-  }
+  if (await isAuthorized(request)) return NextResponse.next();
 
   // API-aanroepen krijgen een nette 401 in plaats van een omleiding.
   if (request.nextUrl.pathname.startsWith("/api/")) {
