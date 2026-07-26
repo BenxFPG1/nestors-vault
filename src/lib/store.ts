@@ -46,11 +46,16 @@ export type Query = {
   category?: string;
   tags?: string[];
   colors?: string[];
+  project?: string;
   limit?: number;
 };
 
 export function filterItems(items: Item[], query: Query = {}): Item[] {
   let result = items;
+
+  if (query.project && query.project !== "alles") {
+    result = result.filter((item) => item.projects.includes(query.project!));
+  }
 
   if (query.category && query.category !== "alles") {
     result = result.filter((item) => item.category === query.category);
@@ -104,6 +109,18 @@ export function colorCounts(items: Item[]): { family: Family; count: number }[] 
   return [...counts.entries()]
     .map(([family, count]) => ({ family, count }))
     .sort((a, b) => b.count - a.count);
+}
+
+export function projectCounts(items: Item[]): { project: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    for (const project of item.projects) {
+      counts.set(project, (counts.get(project) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([project, count]) => ({ project, count }))
+    .sort((a, b) => a.project.localeCompare(b.project));
 }
 
 export function stats(items: Item[]) {

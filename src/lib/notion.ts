@@ -17,7 +17,22 @@ export const PROPS = {
   file: "Bestand",
   status: "Status",
   notes: "Notities",
+  projects: "Projecten",
+  annotations: "Aantekeningen",
 } as const;
+
+/**
+ * Een aantekening is een opmerking bij een item. Staat er een positie bij,
+ * dan hoort hij bij een plek op het beeld — dat is de omcirkeling. Zonder
+ * positie is het gewoon een opmerking bij het item als geheel.
+ */
+export type Annotation = {
+  id: string;
+  text: string;
+  at: string;
+  /** Percentages van 0 tot 100, zodat ze op elk schermformaat kloppen. */
+  box?: { x: number; y: number; w: number; h: number };
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyPage = any;
@@ -55,6 +70,8 @@ export type Item = {
   style: string;
   description: string;
   notes: string;
+  projects: string[];
+  annotations: Annotation[];
   sourceUrl: string | null;
   notionUrl: string;
   hasImage: boolean;
@@ -72,10 +89,22 @@ const list = (value: string): string[] =>
     .map((part) => part.trim())
     .filter(Boolean);
 
+function readAnnotations(raw: string): Annotation[] {
+  if (!raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Annotation[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function mapPage(page: AnyPage): Item {
   const props = page.properties ?? {};
   return {
     id: page.id,
+    projects: (props[PROPS.projects]?.multi_select ?? []).map((p: AnyPage) => p.name),
+    annotations: readAnnotations(text(props[PROPS.annotations])),
     title: text(props[PROPS.title]),
     category: props[PROPS.category]?.select?.name ?? "overig",
     tags: (props[PROPS.tags]?.multi_select ?? []).map((t: AnyPage) => t.name),
@@ -252,4 +281,63 @@ export async function attachImage(
       },
     } as AnyPage,
   });
+}
+
+/* ── Projecten, aantekeningen en verwijderen ──────────────────────────── */
+
+export async function setProjects(id: string, projects: string[]): Promise<void> {
+  await notion().pages.update({
+    page_id: id,
+    properties: {
+      [PROPS.projects]: { multi_select: projects.map((name) => ({ name })) },
+    } as AnyPage,
+  });
+}
+
+/**
+ * Notion knipt rich_text in blokken van 2000 tekens. Bij veel aantekeningen
+ * splitsen we de JSON, zodat er niets stilletjes wegvalt.
+ */
+export async function setAnnotations(
+  id: string,
+  annotations: Annotation[],
+): Promise<void> {
+  const json = JSON.stringify(annotations);
+  const chunks = json.match(/[\s\S]{1,1900}/g) ?? [""];
+
+  await notion().pages.update({
+    page_id: id,
+    properties: {
+      [PROPS.annotations]: {
+        rich_text: chunks.map((content) => ({ type: "text", text: { content } })),
+      },
+    } as AnyPage,
+  });
+}
+
+/** Archiveren in Notion: uit de vault, maar terug te halen via de prullenbak. */
+export async function archiveItem(id: string): Promise<void> {
+  await notion().pages.update({ page_id: id, archived: true } as AnyPage);
+}
+
+/** Alle projectnamen die de database kent, ook de nog lege. */
+export async function listProjects(): Promise<string[]> {
+  const db: AnyPage = await notion().databases.retrieve({ database_id: databaseId() });
+  const options = db.properties?.[PROPS.projects]?.multi_select?.options ?? [];
+  return options.map((option: AnyPage) => option.name as string).sort();
+}
+
+export async function createProject(name: string): Promise<void> {
+  const db: AnyPage = await notion().databases.retrieve({ database_id: databaseId() });
+  const existing = db.properties?.[PROPS.projects]?.multi_select?.options ?? [];
+  if (existing.some((option: AnyPage) => option.name === name)) return;
+
+  await notion().databases.update({
+    database_id: databaseId(),
+    properties: {
+      [PROPS.projects]: {
+        multi_select: { options: [...existing, { name }] },
+      },
+    },
+  } as AnyPage);
 }

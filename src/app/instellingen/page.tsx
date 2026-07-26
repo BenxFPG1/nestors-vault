@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { apiKey } from "@/lib/auth";
+import { listProjects } from "@/lib/notion";
 import Copy from "@/components/Copy";
 
 export const dynamic = "force-dynamic";
 
 export default async function Instellingen() {
   const key = await apiKey();
+  const projects = await listProjects();
   const host = (await headers()).get("host") ?? "localhost:3939";
   const protocol = host.startsWith("localhost") ? "http" : "https";
   const base = `${protocol}://${host}`;
@@ -68,6 +70,32 @@ export default async function Instellingen() {
           Voor Claude Code op deze Mac blijft de lokale versie sneller:
         </p>
         <Copy value={`claude mcp add vault -- npx tsx "${process.cwd()}/mcp/server.ts"`} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-medium">Eén project delen met een AI</h2>
+        <p className="text-sm leading-relaxed text-mute">
+          Werk je met een klant of een externe, geef dan een link per project. Wie die
+          heeft, ziet uitsluitend de referenties die aan dat project hangen — de rest van
+          je vault bestaat voor hem niet.
+        </p>
+        {projects.length === 0 ? (
+          <p className="text-sm text-mute">
+            Nog geen projecten. Maak er een aan met de knop{" "}
+            <span className="text-chalk">+ project</span> in de vault.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {projects.map((project) => (
+              <div key={project} className="space-y-1.5">
+                <p className="text-xs text-mute">{project}</p>
+                <Copy
+                  value={`${base}/api/mcp/${key}/p/${encodeURIComponent(project)}`}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">

@@ -34,3 +34,11 @@ body {
 input::placeholder {
   color: var(--color-mute);
 }
+
+/* Horizontaal scrollende filterrijen op mobiel, zonder zichtbare balk. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
