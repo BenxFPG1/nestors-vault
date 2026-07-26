@@ -35,6 +35,8 @@ export default function VaultBrowser({
   const [tagging, setTagging] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [timeline, setTimeline] = useState(false);
+  const zoekVeld = useRef<HTMLInputElement>(null);
 
   const [smart, setSmart] = useState<{ ids: string[]; vraag: string } | null>(null);
   const [thinking, setThinking] = useState(false);
@@ -81,6 +83,48 @@ export default function VaultBrowser({
 
   const toggle = (list: string[], value: string) =>
     list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value];
+
+  // Sneltoetsen: door items lopen zonder telkens terug naar het raster.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+
+      if (event.key === "/" && !typing) {
+        event.preventDefault();
+        zoekVeld.current?.focus();
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (open) setOpen(null);
+        else if (smart) setSmart(null);
+        else if (typing) (target as HTMLInputElement).blur();
+        return;
+      }
+
+      if (typing) return;
+
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        if (!open) return;
+        event.preventDefault();
+        const index = visible.findIndex((item) => item.id === open.id);
+        if (index === -1) return;
+        const next =
+          event.key === "ArrowRight"
+            ? visible[Math.min(index + 1, visible.length - 1)]
+            : visible[Math.max(index - 1, 0)];
+        if (next) setOpen(next);
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, smart, visible]);
 
   const kicked = useRef(false);
   useEffect(() => {
@@ -187,6 +231,7 @@ export default function VaultBrowser({
           <div className="ml-auto flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
             <div className="flex min-w-0 flex-1 items-center rounded-full border border-line bg-surface pr-1 focus-within:border-accent sm:w-72 sm:flex-none">
               <input
+                ref={zoekVeld}
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
@@ -233,6 +278,18 @@ export default function VaultBrowser({
               </button>
             )}
 
+            <button
+              onClick={() => setTimeline((value) => !value)}
+              title="Wissel tussen raster en tijdlijn"
+              className={`hidden shrink-0 rounded-full border px-4 py-2.5 text-sm transition lg:block ${
+                timeline
+                  ? "border-chalk bg-chalk text-ink"
+                  : "border-line text-mute hover:border-accent hover:text-accent"
+              }`}
+            >
+              Tijdlijn
+            </button>
+
             <Link
               href="/instellingen"
               className="hidden shrink-0 rounded-full border border-line px-4 py-2.5 text-sm text-mute transition hover:border-accent hover:text-accent lg:block"
@@ -269,6 +326,14 @@ export default function VaultBrowser({
                   {name}
                 </Pill>
               ))}
+              {project !== "alles" && (
+                <Link
+                  href={`/project/${encodeURIComponent(project)}`}
+                  className="shrink-0 rounded-full border border-accent px-3 py-2 text-xs text-accent transition hover:bg-accent hover:text-ink"
+                >
+                  open {project} →
+                </Link>
+              )}
               <button
                 onClick={newProject}
                 className="shrink-0 rounded-full border border-dashed border-line px-3 py-2 text-xs text-mute transition hover:border-accent hover:text-accent"
@@ -343,6 +408,15 @@ export default function VaultBrowser({
 
         {visible.length === 0 ? (
           <Empty total={counts.total} />
+        ) : timeline ? (
+          <Timeline
+            items={visible}
+            selecting={selecting}
+            selected={selected}
+            onOpen={(item) =>
+              selecting ? setSelected((list) => toggle(list, item.id)) : setOpen(item)
+            }
+          />
         ) : (
           <div className="columns-2 gap-3 sm:gap-4 lg:columns-3 xl:columns-4">
             {visible.map((item) => (
@@ -533,6 +607,60 @@ function Card({
         </div>
       </div>
     </button>
+  );
+}
+
+/**
+ * Tijdlijn per maand. Handig om te zien hoe je smaak verschuift — en om
+ * terug te vinden wat je "ergens in het voorjaar" hebt bewaard.
+ */
+function Timeline({
+  items,
+  selecting,
+  selected,
+  onOpen,
+}: {
+  items: Item[];
+  selecting: boolean;
+  selected: string[];
+  onOpen: (item: Item) => void;
+}) {
+  const maanden = new Map<string, Item[]>();
+  for (const item of items) {
+    const datum = new Date(item.createdAt);
+    const sleutel = `${datum.getFullYear()}-${String(datum.getMonth() + 1).padStart(2, "0")}`;
+    maanden.set(sleutel, [...(maanden.get(sleutel) ?? []), item]);
+  }
+
+  const noemer = new Intl.DateTimeFormat("nl-NL", { month: "long", year: "numeric" });
+
+  return (
+    <div className="space-y-10">
+      {[...maanden.entries()].map(([sleutel, groep]) => {
+        const [jaar, maand] = sleutel.split("-").map(Number);
+        return (
+          <section key={sleutel}>
+            <div className="mb-4 flex items-baseline gap-3 border-b border-line pb-2">
+              <h2 className="text-sm font-medium capitalize">
+                {noemer.format(new Date(jaar, maand - 1, 1))}
+              </h2>
+              <span className="text-xs text-mute">{groep.length}</span>
+            </div>
+            <div className="columns-2 gap-3 sm:gap-4 lg:columns-3 xl:columns-4">
+              {groep.map((item) => (
+                <Card
+                  key={item.id}
+                  item={item}
+                  selecting={selecting}
+                  checked={selected.includes(item.id)}
+                  onOpen={() => onOpen(item)}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 

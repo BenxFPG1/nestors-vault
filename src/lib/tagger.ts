@@ -28,6 +28,11 @@ const TagResult = z.object({
   description: z
     .string()
     .describe("Eén tot twee zinnen: wat is dit en waarom is het bewaard"),
+  text: z
+    .string()
+    .describe(
+      "De tekst die letterlijk in beeld staat: koppen, knopteksten, claims. Max 40 woorden, lege string als er geen tekst is.",
+    ),
 });
 
 export type TagResult = z.infer<typeof TagResult>;
@@ -41,7 +46,9 @@ Regels:
 - Gebruik uitsluitend tags uit de toegestane lijst. Verzin er nooit bij. Liever vier rake tags dan zes vage.
 - Kleuren zijn hex-codes van wat je daadwerkelijk in het beeld ziet.
 - Schrijf alles in het Nederlands, zonder marketingtaal.
-- Beschrijf wat er te zien is en wat het bruikbaar maakt als referentie, niet wat je ervan vindt.`;
+- Beschrijf wat er te zien is en wat het bruikbaar maakt als referentie, niet wat je ervan vindt.
+- Neem bij "text" letterlijk over wat er staat, in de oorspronkelijke taal. Dat maakt het later
+  vindbaar op woorden die je je nog herinnert van de pagina zelf.`;
 
 let client: Anthropic | null = null;
 

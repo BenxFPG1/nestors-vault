@@ -89,6 +89,16 @@ export default function ItemDetail({
     }
   }
 
+  async function retag() {
+    setBusy(true);
+    try {
+      await fetch(`/api/tag?item=${item.id}`, { method: "POST" });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove() {
     setBusy(true);
     try {
@@ -251,8 +261,17 @@ export default function ItemDetail({
               </button>
             )}
 
+            <button
+              onClick={retag}
+              disabled={busy}
+              title="Laat Claude dit item opnieuw beschrijven"
+              className="rounded-full border border-line px-4 py-2.5 text-xs text-mute transition hover:text-chalk disabled:opacity-40"
+            >
+              opnieuw taggen
+            </button>
+
             <span className="ml-auto text-[11px] text-mute">
-              {busy ? "opslaan…" : ""}
+              {busy ? "bezig…" : ""}
             </span>
           </div>
         </div>
@@ -350,6 +369,15 @@ export default function ItemDetail({
             <p className="text-sm leading-relaxed text-chalk/85">{item.description}</p>
           )}
           {item.style && <p className="text-sm text-mute">{item.style}</p>}
+
+          {item.text && (
+            <details className="rounded-xl border border-line bg-raised px-3 py-2.5">
+              <summary className="cursor-pointer text-xs text-mute">
+                Tekst in beeld
+              </summary>
+              <p className="mt-2 text-sm leading-relaxed text-chalk/80">{item.text}</p>
+            </details>
+          )}
 
           <div className="space-y-2">
             <p className="text-xs text-mute">Projecten</p>
@@ -559,6 +587,9 @@ function Note({
   onHover: (id: string | null) => void;
   onDelete: () => void;
 }) {
+  // Twee tikken, want één mistik op een telefoon kost je anders een opmerking.
+  const [sure, setSure] = useState(false);
+
   return (
     <li
       onMouseEnter={() => onHover(note.id)}
@@ -573,13 +604,30 @@ function Note({
         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-mute" />
       )}
       <p className="min-w-0 flex-1 text-sm leading-relaxed text-chalk/90">{note.text}</p>
-      <button
-        onClick={onDelete}
-        aria-label="Opmerking verwijderen"
-        className="shrink-0 px-2 text-sm text-mute transition hover:text-red-400"
-      >
-        ×
-      </button>
+      {sure ? (
+        <span className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onDelete}
+            className="text-xs text-red-400 transition hover:text-red-300"
+          >
+            weg
+          </button>
+          <button
+            onClick={() => setSure(false)}
+            className="text-xs text-mute transition hover:text-chalk"
+          >
+            nee
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={() => setSure(true)}
+          aria-label="Opmerking verwijderen"
+          className="shrink-0 px-2 text-sm text-mute transition hover:text-red-400"
+        >
+          ×
+        </button>
+      )}
     </li>
   );
 }

@@ -9,12 +9,14 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
   const [url, setUrl] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle", text: "" });
+  // Als de vault denkt dat je dit al hebt, bewaren we de poging even.
+  const [twin, setTwin] = useState<{ file: File | null; url: string } | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const busy = status.kind === "busy";
 
-  async function submit(chosen?: File) {
+  async function submit(chosen?: File, force = false) {
     const picked = chosen ?? file;
     if (!picked && !url.trim()) {
       setStatus({ kind: "error", text: "Kies een foto of plak een link." });
@@ -30,11 +32,20 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
     if (picked) body.append("file", picked);
     if (url.trim()) body.append("url", url.trim());
     if (notes.trim()) body.append("notes", notes.trim());
+    if (force) body.append("force", "1");
 
     try {
       const response = await fetch("/api/upload", { method: "POST", body });
       const result = await response.json();
+
+      if (response.status === 409 && result.duplicate) {
+        setTwin({ file: picked ?? null, url: url.trim() });
+        setStatus({ kind: "warn", text: result.error });
+        return;
+      }
+
       if (!response.ok) throw new Error(result.error ?? "Toevoegen mislukt");
+      setTwin(null);
 
       setFile(null);
       setUrl("");
@@ -157,6 +168,33 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
         {status.text ||
           "Sleep een afbeelding hierheen, plak er een uit je klembord, of gebruik de knop."}
       </p>
+
+      {twin && (
+        <div className="mt-2 flex flex-wrap items-center gap-3 px-1">
+          <button
+            onClick={() => {
+              const again = twin;
+              setTwin(null);
+              void submit(again.file ?? undefined, true);
+            }}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-mute transition hover:border-accent hover:text-accent"
+          >
+            toch toevoegen
+          </button>
+          <button
+            onClick={() => {
+              setTwin(null);
+              setFile(null);
+              setUrl("");
+              setStatus({ kind: "idle", text: "" });
+              if (fileInput.current) fileInput.current.value = "";
+            }}
+            className="text-xs text-mute transition hover:text-chalk"
+          >
+            laat maar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

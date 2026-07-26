@@ -22,8 +22,19 @@ export function invalidate(): void {
   cache = null;
 }
 
+// De tekst uit het beeld telt mee: je zoekt vaak op een woord dat je je van
+// de pagina zelf herinnert, niet op hoe de tagger het omschreef.
 const HAYSTACK = (item: Item) =>
-  [item.title, item.description, item.style, item.notes, item.category, ...item.tags]
+  [
+    item.title,
+    item.description,
+    item.style,
+    item.notes,
+    item.text,
+    item.category,
+    ...item.tags,
+    ...item.annotations.map((note) => note.text),
+  ]
     .join(" ")
     .toLowerCase();
 

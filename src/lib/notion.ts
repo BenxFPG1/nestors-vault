@@ -19,6 +19,8 @@ export const PROPS = {
   notes: "Notities",
   projects: "Projecten",
   annotations: "Aantekeningen",
+  text: "Tekst",
+  fingerprint: "Vingerafdruk",
 } as const;
 
 /**
@@ -70,6 +72,10 @@ export type Item = {
   style: string;
   description: string;
   notes: string;
+  /** Wat er letterlijk in het beeld te lezen valt — koppen, knoppen, claims. */
+  text: string;
+  /** Compacte vingerafdruk van het beeld, voor het herkennen van dubbelingen. */
+  fingerprint: string;
   projects: string[];
   annotations: Annotation[];
   sourceUrl: string | null;
@@ -105,6 +111,8 @@ function mapPage(page: AnyPage): Item {
     id: page.id,
     projects: (props[PROPS.projects]?.multi_select ?? []).map((p: AnyPage) => p.name),
     annotations: readAnnotations(text(props[PROPS.annotations])),
+    text: text(props[PROPS.text]),
+    fingerprint: text(props[PROPS.fingerprint]),
     title: text(props[PROPS.title]),
     category: props[PROPS.category]?.select?.name ?? "overig",
     tags: (props[PROPS.tags]?.multi_select ?? []).map((t: AnyPage) => t.name),
@@ -238,8 +246,9 @@ export async function saveTags(
     colors: string[];
     style: string;
     description: string;
+    text?: string;
   },
-  options: { keepTitle?: boolean } = {},
+  options: { keepTitle?: boolean; fingerprint?: string } = {},
 ): Promise<void> {
   const properties: AnyPage = {
     [PROPS.category]: { select: { name: data.category } },
@@ -249,6 +258,9 @@ export async function saveTags(
     [PROPS.description]: rich(data.description),
     [PROPS.status]: { select: { name: "getagd" } },
   };
+
+  if (data.text !== undefined) properties[PROPS.text] = rich(data.text);
+  if (options.fingerprint) properties[PROPS.fingerprint] = rich(options.fingerprint);
 
   if (!options.keepTitle) {
     properties[PROPS.title] = {
@@ -340,4 +352,83 @@ export async function createProject(name: string): Promise<void> {
       },
     },
   } as AnyPage);
+}
+
+/* ── Projectbriefings ─────────────────────────────────────────────────── */
+
+/**
+ * Briefings kunnen niet in een multi-select, dus die krijgen een eigen kleine
+ * database naast de vault. Hij maakt zichzelf aan en wordt teruggevonden op
+ * naam, zodat er geen extra instelling bij komt kijken.
+ */
+const BRIEFING_DB = "Vault-projecten";
+let briefingDbId: string | null = null;
+
+async function briefingDatabase(): Promise<string> {
+  if (briefingDbId) return briefingDbId;
+
+  const vault: AnyPage = await notion().databases.retrieve({ database_id: databaseId() });
+  const parentPage = vault.parent?.page_id;
+  if (!parentPage) throw new Error("De vault-database hangt niet onder een pagina");
+
+  const children: AnyPage = await notion().blocks.children.list({
+    block_id: parentPage,
+    page_size: 100,
+  });
+
+  for (const block of children.results) {
+    if (block.type === "child_database" && block.child_database?.title === BRIEFING_DB) {
+      briefingDbId = block.id;
+      return briefingDbId!;
+    }
+  }
+
+  const created: AnyPage = await notion().databases.create({
+    parent: { type: "page_id", page_id: parentPage },
+    title: [{ type: "text", text: { content: BRIEFING_DB } }],
+    properties: {
+      Naam: { title: {} },
+      Briefing: { rich_text: {} },
+    },
+  });
+
+  briefingDbId = created.id;
+  return briefingDbId!;
+}
+
+export type Briefing = { project: string; text: string; pageId: string };
+
+export async function listBriefings(): Promise<Briefing[]> {
+  try {
+    const res: AnyPage = await notion().databases.query({
+      database_id: await briefingDatabase(),
+      page_size: 100,
+    });
+    return res.results.map((page: AnyPage) => ({
+      project: text(page.properties?.Naam),
+      text: text(page.properties?.Briefing),
+      pageId: page.id,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function saveBriefing(project: string, briefing: string): Promise<void> {
+  const database = await briefingDatabase();
+  const existing = (await listBriefings()).find((entry) => entry.project === project);
+
+  const properties: AnyPage = {
+    Briefing: {
+      rich_text: [{ type: "text", text: { content: briefing.slice(0, 1900) } }],
+    },
+  };
+
+  if (existing) {
+    await notion().pages.update({ page_id: existing.pageId, properties });
+    return;
+  }
+
+  properties.Naam = { title: [{ type: "text", text: { content: project } }] };
+  await notion().pages.create({ parent: { database_id: database }, properties });
 }

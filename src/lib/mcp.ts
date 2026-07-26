@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { imageUrl, type Item } from "./notion";
+import { imageUrl, listBriefings, type Item } from "./notion";
 import { allItems, filterItems, tagCounts, stats } from "./store";
 import { interpret, rank } from "./smartSearch";
 import { CATEGORIES } from "./taxonomy";
@@ -78,6 +78,7 @@ function describe(item: Item): Block {
       item.colors.length ? `kleuren: ${item.colors.join(", ")}` : null,
       item.style ? `stijl: ${item.style}` : null,
       item.description ? `beschrijving: ${item.description}` : null,
+      item.text ? `tekst in beeld: ${item.text}` : null,
       item.notes ? `notitie: ${item.notes}` : null,
       notes.length ? `opmerkingen van de eigenaar:\n${notes.join("\n")}` : null,
       item.sourceUrl ? `bron: ${item.sourceUrl}` : null,
@@ -118,12 +119,22 @@ async function callTool(
 
   if (name === "vault_overzicht") {
     const counts = stats(items);
+
+    // Bij een projectlink hoort de briefing erbij: die vertelt waaróm deze
+    // referenties bij elkaar staan.
+    let briefing = "";
+    if (scope) {
+      const found = (await listBriefings()).find((entry) => entry.project === scope);
+      if (found?.text) briefing = `\nBriefing:\n${found.text}\n`;
+    }
+
     return {
       content: [
         {
           type: "text",
           text: [
             scope ? `Project: ${scope}` : "Volledige vault",
+            briefing,
             `${counts.total} items (${counts.tagged} getagd, ${counts.untagged} nog niet).`,
             "",
             `Categorieën: ${CATEGORIES.join(", ")}`,

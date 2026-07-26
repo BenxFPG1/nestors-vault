@@ -3,7 +3,8 @@ import sharp from "sharp";
 import { createPage, attachImage, saveTags, setStatus, getItem } from "@/lib/notion";
 import { previewFor } from "@/lib/preview";
 import { tagImage } from "@/lib/tagger";
-import { invalidate } from "@/lib/store";
+import { allItems, invalidate } from "@/lib/store";
+import { fingerprint, distance, DUPLICATE_THRESHOLD } from "@/lib/fingerprint";
 
 export const maxDuration = 60;
 
@@ -63,7 +64,32 @@ export async function POST(request: Request) {
       image = await previewFor(sourceUrl);
     }
 
-    // 2. Aanmaken in Notion — de enige plek waar de vault leeft.
+    // 2. Al eens opgeslagen? Twee screenshots van dezelfde pagina zien er
+    //    zelden byte-voor-byte gelijk uit, dus we vergelijken op vingerafdruk.
+    let print = "";
+    if (image) {
+      print = await fingerprint(image.data);
+      const twin = (await allItems()).find(
+        (entry) =>
+          entry.fingerprint && distance(entry.fingerprint, print) < DUPLICATE_THRESHOLD,
+      );
+
+      if (twin && form.get("force") !== "1") {
+        return NextResponse.json(
+          {
+            duplicate: {
+              id: twin.id,
+              title: twin.title,
+              createdAt: twin.createdAt,
+            },
+            error: `Dit lijkt op "${twin.title || "een item"}" dat je al hebt.`,
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    // 3. Aanmaken in Notion — de enige plek waar de vault leeft.
     const page = await createPage({
       notes,
       sourceUrl,
@@ -83,10 +109,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Taggen. Mislukt dat, dan staat het item er wél — alleen zonder tags.
+    // 4. Taggen. Mislukt dat, dan staat het item er wél — alleen zonder tags.
     try {
       const result = await tagImage(image, { sourceUrl, notes, title: null });
-      await saveTags(page.id, result);
+      await saveTags(page.id, result, { fingerprint: print });
     } catch (error) {
       await setStatus(page.id, "mislukt");
       invalidate();

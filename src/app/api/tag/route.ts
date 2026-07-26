@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { imageUrl, saveTags, setStatus } from "@/lib/notion";
 import { tagImage } from "@/lib/tagger";
 import { allItems, invalidate } from "@/lib/store";
+import { fingerprint } from "@/lib/fingerprint";
 
 export const maxDuration = 60;
 
@@ -12,11 +13,15 @@ export const maxDuration = 60;
  */
 const PER_RUN = 3;
 
-async function tagBatch() {
+async function tagBatch(only?: string) {
   const items = await allItems(true);
-  const todo = items
-    .filter((item) => item.tags.length === 0 && item.status !== "mislukt" && item.hasImage)
-    .slice(0, PER_RUN);
+  const todo = only
+    ? items.filter((item) => item.id === only)
+    : items
+        .filter(
+          (item) => item.tags.length === 0 && item.status !== "mislukt" && item.hasImage,
+        )
+        .slice(0, PER_RUN);
 
   let tagged = 0;
   let failed = 0;
@@ -30,16 +35,16 @@ async function tagBatch() {
       const response = await fetch(source);
       if (!response.ok) throw new Error("afbeelding kon niet opgehaald worden");
 
+      const data = Buffer.from(await response.arrayBuffer());
       const result = await tagImage(
-        {
-          data: Buffer.from(await response.arrayBuffer()),
-          type: response.headers.get("content-type") ?? "image/png",
-        },
+        { data, type: response.headers.get("content-type") ?? "image/png" },
         { sourceUrl: item.sourceUrl, notes: item.notes, title: item.title },
       );
 
       await saveTags(item.id, result, {
-        keepTitle: Boolean(item.title) && item.title !== "Nieuw item",
+        // Bij opnieuw taggen mag de titel wél opnieuw bepaald worden.
+        keepTitle: !only && Boolean(item.title) && item.title !== "Nieuw item",
+        fingerprint: item.fingerprint || (await fingerprint(data)),
       });
       tagged++;
       log.push(`Getagd: ${result.title}`);
@@ -63,9 +68,10 @@ async function tagBatch() {
   return { tagged, failed, remaining, log };
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    return NextResponse.json(await tagBatch());
+    const only = new URL(request.url).searchParams.get("item") ?? undefined;
+    return NextResponse.json(await tagBatch(only));
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Taggen mislukt" },
