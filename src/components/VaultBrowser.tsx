@@ -177,7 +177,7 @@ export default function VaultBrowser({
   return (
     <div className="min-h-screen pb-24 sm:pb-0">
       <header className="sticky top-0 z-20 border-b border-line bg-ink/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[1500px] items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
+        <div className="safe-top mx-auto flex max-w-[1500px] items-center gap-2 px-4 pb-3 sm:gap-3 sm:px-6 sm:pb-4">
           <h1 className="shrink-0 text-lg font-medium tracking-tight">Vault</h1>
           <span className="hidden shrink-0 text-xs text-mute sm:inline">
             {counts.total} items
@@ -365,7 +365,8 @@ export default function VaultBrowser({
         <button
           onClick={() => setShowAdd((value) => !value)}
           aria-label="Item toevoegen"
-          className="fixed bottom-5 right-5 z-20 h-14 w-14 rounded-full bg-chalk text-2xl leading-none text-ink shadow-lg transition active:scale-95 sm:hidden"
+          style={{ bottom: "max(1.25rem, calc(env(safe-area-inset-bottom) + 0.5rem))" }}
+          className="fixed right-5 z-20 h-14 w-14 rounded-full bg-chalk text-2xl leading-none text-ink shadow-lg transition active:scale-95 sm:hidden"
         >
           {showAdd ? "×" : "+"}
         </button>
@@ -373,7 +374,7 @@ export default function VaultBrowser({
 
       {selecting && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ink/95 backdrop-blur">
-          <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-3 px-4 py-4 sm:px-6">
+          <div className="safe-bottom mx-auto flex max-w-[1500px] flex-wrap items-center gap-3 px-4 pt-4 sm:px-6">
             <span className="text-sm text-mute">{selected.length} geselecteerd</span>
             {shareUrl && (
               <span className="min-w-0 flex-1 truncate font-mono text-xs text-accent">

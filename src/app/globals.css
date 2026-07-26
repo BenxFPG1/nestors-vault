@@ -42,3 +42,18 @@ input::placeholder {
 .no-scrollbar {
   scrollbar-width: none;
 }
+
+/*
+ * De app vult het hele scherm (viewportFit: cover), dus moeten we zelf
+ * wegblijven bij de notch, de statusbalk en de streep onderaan de iPhone.
+ */
+.safe-top {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+.safe-x {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}

@@ -6,6 +6,9 @@ import type { Annotation } from "@/lib/notion";
 
 type Box = { x: number; y: number; w: number; h: number };
 
+/** Verder dan dit wegvegen betekent: sluiten. */
+const DISMISS_PX = 110;
+
 export default function ItemDetail({
   item,
   similar,
@@ -31,10 +34,14 @@ export default function ItemDetail({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
 
+  // Wegvegen om te sluiten: het blad schuift mee met je vinger.
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+  const swipe = useRef<{ x: number; y: number; axis: "?" | "x" | "y" | "no" } | null>(null);
+
+  const scroller = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
 
-  // Openstaand venster: achtergrond niet mee laten scrollen op mobiel.
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -49,6 +56,7 @@ export default function ItemDetail({
     setMarking(false);
     setDraft(null);
     setConfirmDelete(false);
+    setDrag(null);
   }, [item]);
 
   async function save(next: Annotation[]) {
@@ -106,6 +114,47 @@ export default function ItemDetail({
     ]);
   }
 
+  /* ── Wegvegen om te sluiten ─────────────────────────────────────────── */
+
+  function swipeStart(event: React.PointerEvent) {
+    if (marking || event.pointerType === "mouse") return;
+    swipe.current = { x: event.clientX, y: event.clientY, axis: "?" };
+  }
+
+  function swipeMove(event: React.PointerEvent) {
+    if (!swipe.current) return;
+
+    const dx = event.clientX - swipe.current.x;
+    const dy = event.clientY - swipe.current.y;
+
+    if (swipe.current.axis === "?") {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        swipe.current.axis = "x";
+      } else {
+        // Naar beneden vegen mag alleen bovenaan, anders scroll je gewoon.
+        swipe.current.axis =
+          dy > 0 && (scroller.current?.scrollTop ?? 0) <= 0 ? "y" : "no";
+      }
+    }
+
+    if (swipe.current.axis === "x") setDrag({ x: dx, y: 0 });
+    if (swipe.current.axis === "y") setDrag({ x: 0, y: Math.max(0, dy) });
+  }
+
+  function swipeEnd() {
+    if (!swipe.current) return;
+    const axis = swipe.current.axis;
+    swipe.current = null;
+
+    const moved = axis === "x" ? Math.abs(drag?.x ?? 0) : (drag?.y ?? 0);
+    if ((axis === "x" || axis === "y") && moved > DISMISS_PX) {
+      onClose();
+      return;
+    }
+    setDrag(null);
+  }
+
   /* ── Omcirkelen op het beeld ────────────────────────────────────────── */
 
   function pointFrom(event: React.PointerEvent) {
@@ -139,15 +188,9 @@ export default function ItemDetail({
     if (!drawing) return;
     start.current = null;
 
-    // Een tik zonder slepen wordt een klein kadertje rond dat punt.
     const box =
       drawing.w < 2 || drawing.h < 2
-        ? {
-            x: Math.max(0, drawing.x - 6),
-            y: Math.max(0, drawing.y - 6),
-            w: 12,
-            h: 12,
-          }
+        ? { x: Math.max(0, drawing.x - 6), y: Math.max(0, drawing.y - 6), w: 12, h: 12 }
         : drawing;
 
     setDrawing(null);
@@ -157,65 +200,61 @@ export default function ItemDetail({
   const pinned = notes.filter((note) => note.box);
   const plain = notes.filter((note) => !note.box);
 
+  const shift = drag
+    ? { transform: `translate(${drag.x}px, ${drag.y}px)`, transition: "none" }
+    : { transform: "translate(0,0)" };
+
+  const fade = drag
+    ? Math.max(0.35, 1 - (Math.abs(drag.x) + drag.y) / 400)
+    : 1;
+
   return (
     <div
+      ref={scroller}
       className="fixed inset-0 z-30 overflow-y-auto overscroll-contain bg-ink/85 backdrop-blur-sm sm:p-6"
+      style={{ backgroundColor: `rgba(14,14,15,${0.85 * fade})` }}
       onClick={onClose}
+      onPointerDown={swipeStart}
+      onPointerMove={swipeMove}
+      onPointerUp={swipeEnd}
+      onPointerCancel={swipeEnd}
     >
       <div
-        className="mx-auto min-h-full w-full max-w-4xl border-line bg-surface sm:my-4 sm:min-h-0 sm:rounded-2xl sm:border"
+        style={shift}
+        className="mx-auto min-h-full w-full max-w-4xl border-line bg-surface transition-transform duration-200 sm:my-4 sm:min-h-0 sm:rounded-2xl sm:border"
         onClick={(event) => event.stopPropagation()}
       >
-        {/* Balk bovenaan blijft staan, ook als je op je telefoon scrolt. */}
-        <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur">
-          <button
-            onClick={onClose}
-            className="rounded-full border border-line px-3 py-2 text-xs text-mute transition hover:text-chalk"
-          >
-            sluiten
-          </button>
-
-          {item.hasImage && (
+        {/* Onder de notch vandaan, en met een greep om weg te vegen. */}
+        <div className="safe-top sticky top-0 z-10 border-b border-line bg-surface/95 pb-3 backdrop-blur">
+          <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-line sm:hidden" />
+          <div className="flex items-center gap-2 px-4">
             <button
-              onClick={() => {
-                setMarking((value) => !value);
-                setDraft(null);
-              }}
-              className={`rounded-full border px-3 py-2 text-xs transition ${
-                marking
-                  ? "border-accent bg-accent text-ink"
-                  : "border-line text-mute hover:text-chalk"
-              }`}
+              onClick={onClose}
+              className="rounded-full border border-line px-4 py-2.5 text-xs text-mute transition hover:text-chalk"
             >
-              {marking ? "klaar met markeren" : "markeer op beeld"}
+              sluiten
             </button>
-          )}
 
-          <span className="ml-auto text-[11px] text-mute">{busy ? "opslaan…" : ""}</span>
+            {item.hasImage && (
+              <button
+                onClick={() => {
+                  setMarking((value) => !value);
+                  setDraft(null);
+                }}
+                className={`rounded-full border px-4 py-2.5 text-xs transition ${
+                  marking
+                    ? "border-accent bg-accent text-ink"
+                    : "border-line text-mute hover:text-chalk"
+                }`}
+              >
+                {marking ? "klaar met markeren" : "markeer op beeld"}
+              </button>
+            )}
 
-          {confirmDelete ? (
-            <span className="flex items-center gap-2">
-              <button
-                onClick={remove}
-                className="rounded-full bg-red-500/90 px-3 py-2 text-xs text-ink transition hover:bg-red-500"
-              >
-                echt verwijderen
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="text-xs text-mute transition hover:text-chalk"
-              >
-                nee
-              </button>
+            <span className="ml-auto text-[11px] text-mute">
+              {busy ? "opslaan…" : ""}
             </span>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="rounded-full border border-line px-3 py-2 text-xs text-mute transition hover:border-red-500/60 hover:text-red-400"
-            >
-              verwijder
-            </button>
-          )}
+          </div>
         </div>
 
         {item.hasImage && (
@@ -301,7 +340,7 @@ export default function ItemDetail({
           </div>
         )}
 
-        <div className="space-y-6 p-4 sm:p-6">
+        <div className="safe-bottom space-y-6 p-4 sm:p-6">
           <div>
             <h2 className="text-xl font-medium">{item.title || "Zonder titel"}</h2>
             <p className="mt-1 text-sm text-accent">{item.category}</p>
@@ -312,7 +351,6 @@ export default function ItemDetail({
           )}
           {item.style && <p className="text-sm text-mute">{item.style}</p>}
 
-          {/* Projecten */}
           <div className="space-y-2">
             <p className="text-xs text-mute">Projecten</p>
             <div className="flex flex-wrap gap-2">
@@ -346,7 +384,6 @@ export default function ItemDetail({
             </div>
           </div>
 
-          {/* Opmerkingen */}
           <div className="space-y-3">
             <p className="text-xs text-mute">Opmerkingen</p>
 
@@ -475,6 +512,36 @@ export default function ItemDetail({
               </div>
             </div>
           )}
+
+          {/* Verwijderen staat onderaan: buiten bereik van je duim bij het sluiten. */}
+          <div className="border-t border-line pt-5">
+            {confirmDelete ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm text-mute">
+                  Weg uit de vault? Je kunt hem in Notion nog terughalen.
+                </span>
+                <button
+                  onClick={remove}
+                  className="rounded-full bg-red-500/90 px-4 py-2.5 text-xs text-ink transition hover:bg-red-500"
+                >
+                  ja, verwijder
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-xs text-mute transition hover:text-chalk"
+                >
+                  nee
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="rounded-full border border-line px-4 py-2.5 text-xs text-mute transition hover:border-red-500/60 hover:text-red-400"
+              >
+                verwijder dit item
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -509,7 +576,7 @@ function Note({
       <button
         onClick={onDelete}
         aria-label="Opmerking verwijderen"
-        className="shrink-0 text-xs text-mute transition hover:text-red-400"
+        className="shrink-0 px-2 text-sm text-mute transition hover:text-red-400"
       >
         ×
       </button>
