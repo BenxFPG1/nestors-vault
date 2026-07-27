@@ -8,6 +8,7 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
   const [notes, setNotes] = useState("");
+  const [fullPage, setFullPage] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: "idle", text: "" });
   // Als de vault denkt dat je dit al hebt, bewaren we de poging even.
   const [twin, setTwin] = useState<{ file: File | null; url: string } | null>(null);
@@ -25,7 +26,11 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
 
     setStatus({
       kind: "busy",
-      text: picked ? "Uploaden en taggen…" : "Screenshot maken en taggen…",
+      text: picked
+        ? "Uploaden en taggen…"
+        : fullPage
+          ? "Hele pagina vastleggen, dit duurt wat langer…"
+          : "Screenshot maken en taggen…",
     });
 
     const body = new FormData();
@@ -33,6 +38,7 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
     if (url.trim()) body.append("url", url.trim());
     if (notes.trim()) body.append("notes", notes.trim());
     if (force) body.append("force", "1");
+    if (fullPage && !picked) body.append("fullPage", "1");
 
     try {
       const response = await fetch("/api/upload", { method: "POST", body });
@@ -151,7 +157,7 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
             if (event.key === "Enter") void submit();
           }}
           disabled={busy}
-          placeholder="notitie (optioneel)"
+          placeholder="waarom bewaar je dit?"
           className="min-w-0 rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none transition focus:border-accent disabled:opacity-50 sm:w-48"
         />
 
@@ -163,6 +169,18 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
           {busy ? "Bezig…" : "Toevoegen"}
         </button>
       </div>
+
+      {url.trim() && (
+        <label className="mt-3 flex cursor-pointer items-center gap-2 px-1 text-xs text-mute">
+          <input
+            type="checkbox"
+            checked={fullPage}
+            onChange={(event) => setFullPage(event.target.checked)}
+            className="h-4 w-4 accent-[var(--color-accent)]"
+          />
+          Hele pagina vastleggen — je kunt hem daarna doorscrollen
+        </label>
+      )}
 
       <p className={`mt-2 px-1 text-xs ${tone}`}>
         {status.text ||

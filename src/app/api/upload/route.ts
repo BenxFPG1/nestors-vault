@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         name: file.name || `upload${normalized.ext}`,
       };
     } else if (sourceUrl) {
-      image = await previewFor(sourceUrl);
+      image = await previewFor(sourceUrl, { fullPage: form.get("fullPage") === "1" });
     }
 
     // 2. Al eens opgeslagen? Twee screenshots van dezelfde pagina zien er

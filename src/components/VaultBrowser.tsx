@@ -564,7 +564,7 @@ function Card({
             src={`/api/media/${item.id}`}
             alt={item.title}
             loading="lazy"
-            className="w-full"
+            className="max-h-[460px] w-full object-cover object-top"
           />
         ) : (
           <div className="flex h-32 items-center justify-center text-xs text-mute">

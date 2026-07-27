@@ -6,6 +6,15 @@ import type { Annotation } from "@/lib/notion";
 
 type Box = { x: number; y: number; w: number; h: number };
 
+/** "https://www.funtownstudio.com/over" wordt "funtownstudio.com". */
+function hostVan(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "de site";
+  }
+}
+
 /** Verder dan dit wegvegen betekent: sluiten. */
 const DISMISS_PX = 110;
 
@@ -83,6 +92,25 @@ export default function ItemDetail({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projects: next }),
       });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const [probleem, setProbleem] = useState<string | null>(null);
+
+  async function haalBeeldOp() {
+    setBusy(true);
+    setProbleem(null);
+    try {
+      const response = await fetch(`/api/item/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refetchImage: true }),
+      });
+      const result = await response.json();
+      if (!response.ok) setProbleem(result.error ?? "Ophalen mislukt");
       onChanged();
     } finally {
       setBusy(false);
@@ -282,7 +310,9 @@ export default function ItemDetail({
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
-            className={`relative select-none ${marking ? "cursor-crosshair touch-none" : ""}`}
+            className={`relative max-h-[70vh] select-none overflow-y-auto overscroll-contain ${
+              marking ? "cursor-crosshair touch-none" : ""
+            }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -360,10 +390,57 @@ export default function ItemDetail({
         )}
 
         <div className="safe-bottom space-y-6 p-4 sm:p-6">
-          <div>
-            <h2 className="text-xl font-medium">{item.title || "Zonder titel"}</h2>
-            <p className="mt-1 text-sm text-accent">{item.category}</p>
+          {!item.hasImage && item.sourceUrl && (
+            <div className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <p className="text-sm leading-relaxed text-chalk/85">
+                Bij deze link kwam er geen screenshot binnen, dus is er ook niets
+                getagd.
+              </p>
+              {probleem && <p className="text-xs text-amber-400">{probleem}</p>}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={haalBeeldOp}
+                  disabled={busy}
+                  className="rounded-full bg-chalk px-4 py-2.5 text-xs font-medium text-ink transition disabled:opacity-50"
+                >
+                  {busy ? "bezig…" : "probeer opnieuw"}
+                </button>
+                <a
+                  href={item.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-line px-4 py-2.5 text-xs text-mute transition hover:text-chalk"
+                >
+                  site openen
+                </a>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-xl font-medium">{item.title || "Zonder titel"}</h2>
+              <p className="mt-1 text-sm text-accent">{item.category}</p>
+            </div>
+
+            {item.sourceUrl && (
+              <a
+                href={item.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-chalk px-4 py-2.5 text-xs font-medium text-ink transition active:scale-95"
+              >
+                Open {hostVan(item.sourceUrl)} ↗
+              </a>
+            )}
           </div>
+
+          {item.notes && (
+            <div className="rounded-xl border-l-2 border-accent bg-raised px-4 py-3">
+              <p className="text-[11px] text-mute">Waarom bewaard</p>
+              <p className="mt-1 text-sm leading-relaxed text-chalk/90">{item.notes}</p>
+            </div>
+          )}
 
           {item.description && (
             <p className="text-sm leading-relaxed text-chalk/85">{item.description}</p>
@@ -493,16 +570,6 @@ export default function ItemDetail({
           </div>
 
           <div className="flex gap-4 border-t border-line pt-4 text-xs">
-            {item.sourceUrl && (
-              <a
-                href={item.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-mute transition hover:text-accent"
-              >
-                Bron openen
-              </a>
-            )}
             <a
               href={item.notionUrl}
               target="_blank"

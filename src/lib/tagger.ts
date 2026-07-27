@@ -74,9 +74,26 @@ export async function tagImage(
     : null;
   let data = image.data;
 
-  // Onbekend formaat of te groot: eerst door sharp. Het origineel in Notion
-  // blijft ongemoeid; dit is alleen de kopie die naar het model gaat.
-  if (!mediaType || data.byteLength > MAX_IMAGE_BYTES) {
+  // Bij een opname van een hele pagina beoordelen we alleen het bovenste
+  // stuk. Een pagina van tienduizend pixels indampen tot één vierkantje
+  // maakt hem onleesbaar, en de stijl van een site wordt bovenin bepaald.
+  const meta = await sharp(data).metadata();
+  const hoogte = meta.height ?? 0;
+  const breedte = meta.width ?? 0;
+
+  if (breedte > 0 && hoogte > breedte * 2.2) {
+    data = await sharp(data)
+      .extract({
+        left: 0,
+        top: 0,
+        width: breedte,
+        height: Math.min(hoogte, Math.round(breedte * 1.6)),
+      })
+      .resize({ width: 1400, withoutEnlargement: true })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    mediaType = "image/jpeg";
+  } else if (!mediaType || data.byteLength > MAX_IMAGE_BYTES) {
     data = await sharp(data)
       .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 80 })
