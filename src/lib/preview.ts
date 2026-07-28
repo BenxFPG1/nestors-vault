@@ -13,7 +13,7 @@ import sharp from "sharp";
 
 export type Preview = { data: Buffer; type: string; name: string; via: string };
 
-const TIMEOUT_MS = 25_000;
+const TIMEOUT_MS = 14_000;
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 
@@ -163,7 +163,19 @@ export async function previewFor(
         () => viaGrootsteAfbeelding(target),
       ];
 
-  for (const route of routes) {
+  // De twee screenshot-diensten tegelijk aanspreken in plaats van na elkaar.
+  // Vroeger wachtten we tot de eerste opgaf voordat de tweede begon; bij een
+  // trage dienst kostte dat een halve minuut. Nu telt wie het eerst klaar is,
+  // met voorrang voor de dienst die bovenaan staat.
+  const [voorkeur, reserve, ...rest] = routes;
+
+  const uitkomsten = await Promise.allSettled([voorkeur(), reserve()]);
+  for (const uitkomst of uitkomsten) {
+    if (uitkomst.status === "fulfilled" && uitkomst.value) return uitkomst.value;
+  }
+
+  // Beide diensten weigerden: dan alsnog de pagina zelf uitpluizen.
+  for (const route of rest) {
     const found = await route();
     if (found) return found;
   }

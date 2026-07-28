@@ -45,7 +45,12 @@ export default function ItemDetail({
 
   // Wegvegen om te sluiten: het blad schuift mee met je vinger.
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
-  const swipe = useRef<{ x: number; y: number; axis: "?" | "x" | "y" | "no" } | null>(null);
+  const swipe = useRef<{
+    x: number;
+    y: number;
+    axis: "?" | "x" | "y" | "no";
+    binnenScrollgebied: boolean;
+  } | null>(null);
 
   const scroller = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
@@ -156,7 +161,20 @@ export default function ItemDetail({
 
   function swipeStart(event: React.PointerEvent) {
     if (marking || event.pointerType === "mouse") return;
-    swipe.current = { x: event.clientX, y: event.clientY, axis: "?" };
+
+    // Begon je vinger in een gebied dat zelf kan scrollen — een lange
+    // paginaopname bijvoorbeeld? Dan wint scrollen van wegvegen. Zonder deze
+    // controle kaapt het sluitgebaar elke veeg over het beeld.
+    const gebied = (event.target as HTMLElement).closest?.(
+      "[data-scrollgebied]",
+    ) as HTMLElement | null;
+
+    swipe.current = {
+      x: event.clientX,
+      y: event.clientY,
+      axis: "?",
+      binnenScrollgebied: Boolean(gebied && gebied.scrollHeight > gebied.clientHeight + 4),
+    };
   }
 
   function swipeMove(event: React.PointerEvent) {
@@ -167,7 +185,11 @@ export default function ItemDetail({
 
     if (swipe.current.axis === "?") {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      if (Math.abs(dx) > Math.abs(dy)) {
+
+      if (swipe.current.binnenScrollgebied) {
+        // Binnen een scrollgebied laten we alles met rust.
+        swipe.current.axis = "no";
+      } else if (Math.abs(dx) > Math.abs(dy)) {
         swipe.current.axis = "x";
       } else {
         // Naar beneden vegen mag alleen bovenaan, anders scroll je gewoon.
@@ -310,8 +332,9 @@ export default function ItemDetail({
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            data-scrollgebied
             className={`relative max-h-[70vh] select-none overflow-y-auto overscroll-contain ${
-              marking ? "cursor-crosshair touch-none" : ""
+              marking ? "cursor-crosshair touch-none" : "touch-pan-y"
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}

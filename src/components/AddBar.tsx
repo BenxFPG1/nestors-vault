@@ -61,9 +61,18 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
       setStatus(
         result.warning
           ? { kind: "warn", text: result.warning }
-          : { kind: "ok", text: `Toegevoegd: ${result.item?.title || "nieuw item"}` },
+          : result.tagging
+            ? { kind: "ok", text: "Toegevoegd — Claude beschrijft hem nu" }
+            : { kind: "ok", text: `Toegevoegd: ${result.item?.title || "nieuw item"}` },
       );
       onAdded();
+
+      // Het beschrijven loopt door nadat het antwoord al verstuurd is, dus
+      // halen we de kaart zo nog even opnieuw op met tags en al.
+      if (result.tagging) {
+        setTimeout(onAdded, 9000);
+        setTimeout(onAdded, 20000);
+      }
     } catch (error) {
       setStatus({
         kind: "error",

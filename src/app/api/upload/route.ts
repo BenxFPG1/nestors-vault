@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import sharp from "sharp";
 import { createPage, attachImage, saveTags, setStatus, getItem } from "@/lib/notion";
 import { previewFor } from "@/lib/preview";
@@ -98,9 +98,7 @@ export async function POST(request: Request) {
     });
     invalidate();
 
-    if (image) {
-      await attachImage(page.id, image.data, image.name, image.type);
-    } else {
+    if (!image) {
       await setStatus(page.id, "mislukt");
       invalidate();
       return NextResponse.json({
@@ -109,23 +107,29 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Taggen. Mislukt dat, dan staat het item er wél — alleen zonder tags.
-    try {
-      const result = await tagImage(image, { sourceUrl, notes, title: null });
-      await saveTags(page.id, result, { fingerprint: print });
-    } catch (error) {
-      await setStatus(page.id, "mislukt");
-      invalidate();
-      return NextResponse.json({
-        item: await getItem(page.id),
-        warning: `Opgeslagen, maar taggen mislukte: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      });
-    }
+    // 4. Beschrijven en uploaden tegelijk starten. Het model werkt met de
+    //    kopie die we al in handen hebben en hoeft niet te wachten tot Notion
+    //    het bestand heeft ontvangen.
+    const beschrijving = tagImage(image, { sourceUrl, notes, title: null });
+    // Zonder deze vangnet-regel valt de server om op een afwijzing die pas
+    // later wordt opgepakt.
+    beschrijving.catch(() => {});
 
+    await attachImage(page.id, image.data, image.name, image.type);
     invalidate();
-    return NextResponse.json({ item: await getItem(page.id) });
+
+    // 5. Antwoord nu al terug: je ziet de kaart meteen staan. Het beschrijven
+    //    loopt door nadat het antwoord verstuurd is, en schrijft zichzelf weg.
+    after(async () => {
+      try {
+        await saveTags(page.id, await beschrijving, { fingerprint: print });
+      } catch {
+        await setStatus(page.id, "mislukt");
+      }
+      invalidate();
+    });
+
+    return NextResponse.json({ item: await getItem(page.id), tagging: true });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Toevoegen mislukt" },

@@ -6,7 +6,9 @@ import * as z from "zod/v4";
 import sharp from "sharp";
 import { CATEGORIES, TAGS } from "./taxonomy";
 
-const MODEL = process.env.VAULT_TAGGING_MODEL || "claude-opus-5";
+// Haiku is voor dit werk ruim voldoende en een stuk sneller dan Opus; dat
+// scheelt bij elk item dat je toevoegt.
+const MODEL = process.env.VAULT_TAGGING_MODEL || "claude-haiku-4-5";
 
 /** Boven deze grootte verkleinen we eerst; telefoonfoto's zitten er zo overheen. */
 const MAX_IMAGE_BYTES = 3_500_000;
@@ -43,6 +45,11 @@ Je krijgt een screenshot of afbeelding en beschrijft die zo dat hij later terug 
 
 Regels:
 - Kies precies één categorie uit de toegestane lijst.
+- Schrijft de eigenaar erbij waaróm hij dit bewaart, dan is dat leidend voor de
+  categorie — zwaarder dan wat er toevallig op het plaatje staat. "bewaard om de
+  merkopbouw" hoort bij branding, ook als het een website is; "om die e-mailflow"
+  hoort bij marketing, ook al staat er mooie typografie in. Alleen als die reden
+  niets over het soort werk zegt, kies je op wat je ziet.
 - Gebruik uitsluitend tags uit de toegestane lijst. Verzin er nooit bij. Liever vier rake tags dan zes vage.
 - Kleuren zijn hex-codes van wat je daadwerkelijk in het beeld ziet.
 - Schrijf alles in het Nederlands, zonder marketingtaal.
@@ -104,7 +111,7 @@ export async function tagImage(
   const hints = [
     context.title ? `Bestaande titel: ${context.title}` : null,
     context.sourceUrl ? `Bron-URL: ${context.sourceUrl}` : null,
-    context.notes ? `Notitie van de eigenaar: ${context.notes}` : null,
+    context.notes ? `Waarom de eigenaar dit bewaart: ${context.notes}` : null,
   ].filter(Boolean);
 
   const response = await anthropic().messages.parse({
