@@ -104,6 +104,25 @@ Open `vault.nestorscreate.nl` op je telefoon, log één keer in, en kies in het
 deelmenu *Zet op beginscherm*. Hij opent daarna zonder browserbalk, als een app, en
 je blijft een jaar ingelogd.
 
+## Onderhoud en gereedschap
+
+| Commando | Wat het doet |
+| --- | --- |
+| `npm run backup -- ~/pad/naar/map` | Zet de hele vault op je eigen schijf: `vault.json`, een leesbare `index.md` en alle beelden. Alles hangt aan één Notion-database, dus dit is je vangnet. Beelden die er al staan worden overgeslagen. |
+| `npm run dubbel` | Zoekt items die op elkaar lijken, op basis van de vingerafdruk van het beeld. Verwijdert niets — welke van twee de betere is, zie alleen jij. |
+| `npm run import -- ~/pad/naar/map` | Zet een map vol screenshots in één keer in de vault. |
+| `npm run tag:lokaal` | Tagt via Claude Code op je abonnement in plaats van via API-tegoed. Alleen op deze Mac; handig voor grote inhaalslagen. |
+
+## Ontwerprichting
+
+Op elke projectpagina staat **Ontwerprichting**. Die leest de briefing, de referenties en
+vooral jouw eigen opmerkingen, en schrijft er een richting uit: kern, typografie, kleur,
+compositie, een palet, en — het nuttigste — waar de referenties elkaar tegenspreken.
+
+Bedoeld als startpunt voor een gesprek. Hoe meer opmerkingen je bij items zet, hoe scherper
+het wordt: die vertellen waaróm je iets bewaarde, en dat is wat een stapel screenshots
+zelf niet prijsgeeft.
+
 ## MCP-server
 
 ```bash

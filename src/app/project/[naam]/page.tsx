@@ -4,6 +4,7 @@ import { listBriefings, listProjects } from "@/lib/notion";
 import { apiKey } from "@/lib/auth";
 import { headers } from "next/headers";
 import Briefing from "@/components/Briefing";
+import RichtingPaneel from "@/components/Richting";
 import Copy from "@/components/Copy";
 import ProjectGrid from "@/components/ProjectGrid";
 
@@ -65,6 +66,8 @@ export default async function ProjectPage({
 
       <div className="mb-10 space-y-6">
         <Briefing project={project} initial={briefing} />
+
+        <RichtingPaneel project={project} aantal={mine.length} />
 
         <details className="rounded-2xl border border-line bg-surface p-4">
           <summary className="cursor-pointer text-sm text-mute">
