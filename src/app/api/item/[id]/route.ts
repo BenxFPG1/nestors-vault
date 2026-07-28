@@ -16,6 +16,21 @@ import { invalidate } from "@/lib/store";
 
 export const maxDuration = 60;
 
+/**
+ * Eén item opvragen. Het beschrijven loopt na het toevoegen op de achtergrond
+ * door, dus het toevoegvenster vraagt hiermee net zolang na tot de echte titel
+ * en tags binnen zijn.
+ */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const item = await getItem(id);
+  if (!item) return NextResponse.json({ error: "Niet gevonden" }, { status: 404 });
+  return NextResponse.json({ item });
+}
+
 /** Aanpassen van één item: projecten, aantekeningen, of het beeld ophalen. */
 export async function PATCH(
   request: Request,

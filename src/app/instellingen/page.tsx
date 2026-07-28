@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { apiKey } from "@/lib/auth";
 import { listProjects } from "@/lib/notion";
 import Copy from "@/components/Copy";
+import Bookmarklet from "@/components/Bookmarklet";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +34,25 @@ export default async function Instellingen() {
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-base font-medium">Toevoegen vanuit je browser</h2>
+        <p className="text-sm leading-relaxed text-mute">
+          Sleep deze knop naar je favorietenbalk. Sta je op een site die je wilt bewaren,
+          dan klik je hem aan: er springt een klein venster open, je typt in één zin waarom
+          je hem bewaart, en klaar. Werkt in Safari en Chrome.
+        </p>
+        <Bookmarklet basis={base} />
+        <p className="text-sm leading-relaxed text-mute">
+          Zie je je favorietenbalk niet? In Safari via <span className="text-chalk">Weergave
+          → Favorietenbalk tonen</span>, in Chrome met <span className="text-chalk">Cmd+Shift+B</span>.
+        </p>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-base font-medium">Delen vanaf je telefoon</h2>
         <p className="text-sm leading-relaxed text-mute">
-          Met een Snelkoppeling krijg je Vault in het deelmenu van Safari, Instagram en
-          je Foto&apos;s. Screenshot maken, delen, klaar — de app hoeft niet open.
+          Op je telefoon gaat het via het deelmenu, en dat is meteen het handige: dat menu
+          is van iOS zelf, dus dezelfde snelkoppeling werkt in Safari, in Chrome, in
+          Instagram en in je Foto&apos;s. Eén keer instellen, overal bruikbaar.
         </p>
         <ol className="space-y-2 text-sm leading-relaxed text-chalk/85">
           <li>1. Open de app <span className="text-mute">Opdrachten</span> op je iPhone en maak een nieuwe snelkoppeling.</li>
