@@ -13,15 +13,24 @@ export const maxDuration = 60;
  */
 const PER_RUN = 3;
 
-async function tagBatch(only?: string) {
+async function tagBatch(only?: string, ookMislukte = false) {
   const items = await allItems(true);
+
+  // Nooit geprobeerd gaat voor. Eerder mislukt komt er alleen bij als je er
+  // zelf om vraagt: een item dat structureel faalt mag niet elke paginaweergave
+  // en elke cron opnieuw geld kosten.
+  const nieuw = items.filter(
+    (item) => item.tags.length === 0 && item.status !== "mislukt" && item.hasImage,
+  );
+  const mislukte = ookMislukte
+    ? items.filter(
+        (item) => item.tags.length === 0 && item.status === "mislukt" && item.hasImage,
+      )
+    : [];
+
   const todo = only
     ? items.filter((item) => item.id === only)
-    : items
-        .filter(
-          (item) => item.tags.length === 0 && item.status !== "mislukt" && item.hasImage,
-        )
-        .slice(0, PER_RUN);
+    : [...nieuw, ...mislukte].slice(0, PER_RUN);
 
   let tagged = 0;
   let failed = 0;
@@ -61,8 +70,12 @@ async function tagBatch(only?: string) {
 
   invalidate();
 
-  const remaining = (await allItems(true)).filter(
-    (item) => item.tags.length === 0 && item.status !== "mislukt" && item.hasImage,
+  const verse = await allItems(true);
+  const remaining = verse.filter(
+    (item) =>
+      item.tags.length === 0 &&
+      item.hasImage &&
+      (ookMislukte || item.status !== "mislukt"),
   ).length;
 
   return { tagged, failed, remaining, log };
@@ -70,8 +83,9 @@ async function tagBatch(only?: string) {
 
 export async function POST(request: Request) {
   try {
-    const only = new URL(request.url).searchParams.get("item") ?? undefined;
-    return NextResponse.json(await tagBatch(only));
+    const params = new URL(request.url).searchParams;
+    const only = params.get("item") ?? undefined;
+    return NextResponse.json(await tagBatch(only, params.get("opnieuw") === "1"));
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Taggen mislukt" },

@@ -138,7 +138,11 @@ export default function VaultBrowser({
     setTagging(true);
     if (!quiet) setNote(null);
     try {
-      const response = await fetch("/api/tag", { method: "POST" });
+      // Handmatig betekent: probeer ook wat eerder misging. De stille ronde
+      // bij het openen van de vault laat mislukte items met rust.
+      const response = await fetch(quiet ? "/api/tag" : "/api/tag?opnieuw=1", {
+        method: "POST",
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Taggen mislukt");
       if (result.tagged > 0 || !quiet) {
