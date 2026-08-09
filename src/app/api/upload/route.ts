@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { createPage, attachImage, saveTags, setStatus, getItem } from "@/lib/notion";
 import { previewFor } from "@/lib/preview";
 import { tagImage } from "@/lib/tagger";
+import { startTagWorkflow } from "@/lib/github";
 import { allItems, invalidate } from "@/lib/store";
 import { fingerprint, distance, DUPLICATE_THRESHOLD } from "@/lib/fingerprint";
 
@@ -107,29 +108,38 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Beschrijven en uploaden tegelijk starten. Het model werkt met de
-    //    kopie die we al in handen hebben en hoeft niet te wachten tot Notion
-    //    het bestand heeft ontvangen.
-    const beschrijving = tagImage(image, { sourceUrl, notes, title: null });
-    // Zonder deze vangnet-regel valt de server om op een afwijzing die pas
-    // later wordt opgepakt.
-    beschrijving.catch(() => {});
-
     await attachImage(page.id, image.data, image.name, image.type);
     invalidate();
 
-    // 5. Antwoord nu al terug: je ziet de kaart meteen staan. Het beschrijven
-    //    loopt door nadat het antwoord verstuurd is, en schrijft zichzelf weg.
-    after(async () => {
-      try {
-        await saveTags(page.id, await beschrijving, { fingerprint: print });
-      } catch {
-        await setStatus(page.id, "mislukt");
-      }
-      invalidate();
-    });
+    // 4. Beschrijven: eerst de GitHub-workflow proberen (draait op het
+    //    Claude-abonnement, kost geen API-tegoed). Pas als die niet is
+    //    ingesteld valt het terug op direct taggen via de API.
+    const viaActions = await startTagWorkflow();
 
-    return NextResponse.json({ item: await getItem(page.id), tagging: true });
+    if (!viaActions) {
+      const beschrijving = tagImage(image, { sourceUrl, notes, title: null });
+      // Zonder deze vangnet-regel valt de server om op een afwijzing die pas
+      // later wordt opgepakt.
+      beschrijving.catch(() => {});
+
+      // Antwoord nu al terug: je ziet de kaart meteen staan. Het beschrijven
+      // loopt door nadat het antwoord verstuurd is, en schrijft zichzelf weg.
+      after(async () => {
+        try {
+          await saveTags(page.id, await beschrijving, { fingerprint: print });
+        } catch {
+          await setStatus(page.id, "mislukt");
+        }
+        invalidate();
+      });
+    }
+
+    return NextResponse.json({
+      item: await getItem(page.id),
+      tagging: true,
+      // De workflow doet er een paar minuten over; direct taggen ~20 seconden.
+      via: viaActions ? "actions" : "api",
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Toevoegen mislukt" },

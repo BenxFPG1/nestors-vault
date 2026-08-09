@@ -62,16 +62,24 @@ export default function AddBar({ onAdded }: { onAdded: () => void }) {
         result.warning
           ? { kind: "warn", text: result.warning }
           : result.tagging
-            ? { kind: "ok", text: "Toegevoegd — Claude beschrijft hem nu" }
+            ? {
+                kind: "ok",
+                text:
+                  result.via === "actions"
+                    ? "Toegevoegd — Claude beschrijft hem (duurt een paar minuten)"
+                    : "Toegevoegd — Claude beschrijft hem nu",
+              }
             : { kind: "ok", text: `Toegevoegd: ${result.item?.title || "nieuw item"}` },
       );
       onAdded();
 
       // Het beschrijven loopt door nadat het antwoord al verstuurd is, dus
-      // halen we de kaart zo nog even opnieuw op met tags en al.
+      // halen we de kaart later opnieuw op met tags en al. Via GitHub Actions
+      // duurt dat een paar minuten; direct via de API zo'n twintig seconden.
       if (result.tagging) {
-        setTimeout(onAdded, 9000);
-        setTimeout(onAdded, 20000);
+        const momenten =
+          result.via === "actions" ? [90_000, 180_000, 300_000] : [9_000, 20_000];
+        for (const wacht of momenten) setTimeout(onAdded, wacht);
       }
     } catch (error) {
       setStatus({

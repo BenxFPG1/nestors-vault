@@ -138,8 +138,20 @@ export default function VaultBrowser({
     setTagging(true);
     if (!quiet) setNote(null);
     try {
-      // Handmatig betekent: probeer ook wat eerder misging. De stille ronde
-      // bij het openen van de vault laat mislukte items met rust.
+      // Eerst de GitHub-workflow proberen: die tagt op het Claude-abonnement
+      // en kost geen API-tegoed. Duurt een paar minuten; daarna verversen.
+      const actions = await fetch("/api/tag-actions", { method: "POST" });
+      if (actions.ok && (await actions.json()).started) {
+        if (!quiet) {
+          setNote("Tagronde gestart — over een paar minuten staan de tags erop.");
+        }
+        window.setTimeout(() => router.refresh(), 3 * 60_000);
+        window.setTimeout(() => router.refresh(), 6 * 60_000);
+        return;
+      }
+
+      // Terugval: direct taggen via de API. Handmatig betekent: probeer ook
+      // wat eerder misging; de stille ronde laat mislukte items met rust.
       const response = await fetch(quiet ? "/api/tag" : "/api/tag?opnieuw=1", {
         method: "POST",
       });
@@ -278,7 +290,7 @@ export default function VaultBrowser({
                 disabled={tagging}
                 className="hidden shrink-0 rounded-full border border-line px-4 py-2.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-50 lg:block"
               >
-                {tagging ? "Bezig…" : "Tag rest"}
+                {tagging ? "Bezig…" : "Ververs nu"}
               </button>
             )}
 

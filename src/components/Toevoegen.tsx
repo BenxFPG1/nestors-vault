@@ -76,11 +76,15 @@ export default function Toevoegen({
       }
 
       // Het taggen loopt op de achtergrond door, dus we wachten even op de
-      // echte titel in plaats van "Nieuw item" te laten staan.
+      // echte titel in plaats van "Nieuw item" te laten staan. Via GitHub
+      // Actions (abonnement) duurt dat een paar minuten; direct via de API
+      // zo'n twintig seconden.
       if (resultaat.tagging && resultaat.item?.id) {
         setWachten(true);
-        for (let poging = 0; poging < 20; poging++) {
-          await new Promise((r) => setTimeout(r, 2500));
+        const pogingen = resultaat.via === "actions" ? 60 : 20;
+        const pauze = resultaat.via === "actions" ? 5000 : 2500;
+        for (let poging = 0; poging < pogingen; poging++) {
+          await new Promise((r) => setTimeout(r, pauze));
           try {
             const verse = await fetch(`/api/item/${resultaat.item.id}`);
             if (!verse.ok) continue;
@@ -241,7 +245,8 @@ export default function Toevoegen({
           )}
 
           <p className="text-center text-[11px] text-mute">
-            Duurt ongeveer twintig seconden. Je kunt dit venster daarna sluiten.
+            Toevoegen duurt een paar seconden; de beschrijving volgt vanzelf.
+            Je kunt dit venster daarna gewoon sluiten.
           </p>
         </>
       )}
