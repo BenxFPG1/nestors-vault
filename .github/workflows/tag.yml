@@ -1,0 +1,45 @@
+# Tagt nieuwe vault-items automatisch via je Claude-abonnement — geen
+# API-tegoed, geen Mac die aan moet staan. Draait elk uur op GitHub Actions
+# met hetzelfde script als `npm run tag:lokaal`.
+#
+# Vereist drie repo-secrets (Settings → Secrets and variables → Actions):
+#   NOTION_TOKEN              — de Notion-integratietoken
+#   NOTION_DATABASE_ID        — de database-id van de vault
+#   CLAUDE_CODE_OAUTH_TOKEN   — maak lokaal met `claude setup-token`
+#                               (1 jaar geldig; daarna opnieuw genereren)
+name: Vault taggen
+
+on:
+  schedule:
+    # elk uur, op :17 (rond het hele uur is Actions druk en start je later)
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: vault-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dependencies installeren
+        run: npm ci
+
+      - name: Claude Code installeren
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Nieuwe items taggen
+        run: npx tsx scripts/tag-lokaal.ts --aantal 25
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

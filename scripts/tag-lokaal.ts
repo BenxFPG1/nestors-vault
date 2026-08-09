@@ -180,12 +180,17 @@ for (const [nummer, item] of todo.entries()) {
     if (
       melding.includes("authenticate") ||
       melding.includes("OAuth") ||
+      melding.includes("logged in") ||
+      melding.includes("Login expired") ||
       melding.includes("Credit balance")
     ) {
       console.log(
-        "\nClaude Code is niet ingelogd op je abonnement." +
-          "\nDraai `claude` in een terminal en log in met /login. Daarna werkt dit script.",
+        "\nClaude Code kan niet bij je abonnement." +
+          "\nLokaal: draai `claude` en log in met /login." +
+          "\nIn GitHub Actions: genereer een nieuwe token met `claude setup-token`" +
+          "\nen zet hem als repo-secret CLAUDE_CODE_OAUTH_TOKEN.",
       );
+      process.exitCode = 1;
       break;
     }
 
