@@ -432,3 +432,49 @@ export async function saveBriefing(project: string, briefing: string): Promise<v
   properties.Naam = { title: [{ type: "text", text: { content: project } }] };
   await notion().pages.create({ parent: { database_id: database }, properties });
 }
+
+// ── designfile: het complete ontwerpdocument per project ──
+
+/** Voegt de kolom "Designfile" toe aan de briefing-database (idempotent). */
+async function ensureDesignfileProperty(): Promise<string> {
+  const database = await briefingDatabase();
+  await notion().databases.update({
+    database_id: database,
+    properties: { Designfile: { rich_text: {} } },
+  } as AnyPage);
+  return database;
+}
+
+export async function getDesignfile(project: string): Promise<string> {
+  try {
+    const database = await briefingDatabase();
+    const res: AnyPage = await notion().databases.query({
+      database_id: database,
+      page_size: 100,
+    });
+    const page = res.results.find((entry: AnyPage) => text(entry.properties?.Naam) === project);
+    return page ? text(page.properties?.Designfile) : "";
+  } catch {
+    return "";
+  }
+}
+
+export async function saveDesignfile(project: string, content: string): Promise<void> {
+  const database = await ensureDesignfileProperty();
+  const existing = (await listBriefings()).find((entry) => entry.project === project);
+
+  // Notion begrenst één tekstfragment tot ~2000 tekens; een designfile is
+  // langer, dus we knippen hem in stukken binnen dezelfde property.
+  const chunks: { type: "text"; text: { content: string } }[] = [];
+  for (let i = 0; i < content.length && chunks.length < 90; i += 1900) {
+    chunks.push({ type: "text", text: { content: content.slice(i, i + 1900) } });
+  }
+
+  const properties: AnyPage = { Designfile: { rich_text: chunks } };
+  if (existing) {
+    await notion().pages.update({ page_id: existing.pageId, properties });
+    return;
+  }
+  properties.Naam = { title: [{ type: "text", text: { content: project } }] };
+  await notion().pages.create({ parent: { database_id: database }, properties });
+}

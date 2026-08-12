@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { allItems, tagCounts } from "@/lib/store";
-import { listBriefings, listProjects } from "@/lib/notion";
+import { listBriefings, listProjects, getDesignfile } from "@/lib/notion";
 import { apiKey } from "@/lib/auth";
 import { headers } from "next/headers";
 import Briefing from "@/components/Briefing";
+import Designfile from "@/components/Designfile";
 import RichtingPaneel from "@/components/Richting";
 import Copy from "@/components/Copy";
 import ProjectGrid from "@/components/ProjectGrid";
@@ -18,12 +19,13 @@ export default async function ProjectPage({
   const { naam } = await params;
   const project = decodeURIComponent(naam);
 
-  const [items, briefings, projects, key, headerList] = await Promise.all([
+  const [items, briefings, projects, key, headerList, designfile] = await Promise.all([
     allItems(),
     listBriefings(),
     listProjects(),
     apiKey(),
     headers(),
+    getDesignfile(project),
   ]);
 
   const mine = items.filter((item) => item.projects.includes(project));
@@ -66,6 +68,7 @@ export default async function ProjectPage({
 
       <div className="mb-10 space-y-6">
         <Briefing project={project} initial={briefing} />
+        <Designfile project={project} initial={designfile} />
 
         <RichtingPaneel project={project} aantal={mine.length} />
 
