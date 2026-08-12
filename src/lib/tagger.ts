@@ -50,6 +50,10 @@ Regels:
   merkopbouw" hoort bij branding, ook als het een website is; "om die e-mailflow"
   hoort bij marketing, ook al staat er mooie typografie in. Alleen als die reden
   niets over het soort werk zegt, kies je op wat je ziet.
+- Websites die zelf inspiratie, tips, tutorials of tools verzamelen (galerijen zoals
+  Awwwards of Godly, artikelen over designtechniek, hulpmiddelen) krijgen categorie
+  "bron" met een passende tag: galerij, tutorial, tool of artikel. Het gaat dan om de
+  vindplaats, niet om het ontwerp van die site zelf.
 - Gebruik uitsluitend tags uit de toegestane lijst. Verzin er nooit bij. Liever vier rake tags dan zes vage.
 - Kleuren zijn hex-codes van wat je daadwerkelijk in het beeld ziet.
 - Schrijf alles in het Nederlands, zonder marketingtaal.

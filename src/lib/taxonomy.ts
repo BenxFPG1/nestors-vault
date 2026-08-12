@@ -12,6 +12,7 @@ export const CATEGORIES = [
   "motion",
   "product",
   "print",
+  "bron",
   "overig",
 ] as const;
 
@@ -75,6 +76,11 @@ export const TAGS = [
   "iconografie",
   "verpakking",
   "logo",
+  // bronnen
+  "galerij",
+  "tutorial",
+  "tool",
+  "artikel",
 ] as const;
 
 export type Tag = (typeof TAGS)[number];
